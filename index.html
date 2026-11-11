@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lithium-Ion Battery Prognostics Console</title>
+
+  <!-- Plus Jakarta Sans Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    * {
+      font-family: 'Plus Jakarta Sans', sans-serif !important;
+    }
+
+    @keyframes scanbeam_anim_k81 {
+      0% {
+        top: 0%;
+        opacity: 0.2;
+      }
+
+      50% {
+        top: 90%;
+        opacity: 1;
+      }
+
+      100% {
+        top: 0%;
+        opacity: 0.2;
+      }
+    }
+
+    @keyframes pulse_glow_z93 {
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.3));
+      }
+
+      50% {
+        filter: drop-shadow(0 0 24px rgba(16, 185, 129, 0.7));
+      }
+    }
+
+    .scanning-beam-effect-u48 {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
+      animation: scanbeam_anim_k81 1.2s ease-in-out infinite;
+    }
+
+    .battery-pulse-glow-w22 {
+      animation: pulse_glow_z93 1.5s infinite;
+    }
+  </style>
+</head>
+
+<body class="bg-[#050505] text-white min-h-screen p-4 md:p-8 flex flex-col justify-between">
+
+  <div class="max-w-6xl mx-auto w-full space-y-6">
+
+    <!-- Top App Navigation -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-white/10 gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <div
+            class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+            ⚡
+          </div>
+          <h1 class="text-2xl font-bold text-white">
+            Battery RUL Intelligence Engine
+          </h1>
+        </div>
+        <p class="text-neutral-400 text-xs font-bold mt-1">
+          NASA Li-ion degradation benchmark · Physics-informed edge prognostics
+        </p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span id="badge_status_online_m82"
+          class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-950/40 text-emerald-400 border border-emerald-500/20">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          System Ready
+        </span>
+        <button id="btn_toggle_benchmarks_y19" onclick="fetch_model_benchmarks_h7y()"
+          class="px-4 py-1.5 rounded-xl bg-transparent hover:bg-white/[0.08] border border-white/10 text-xs font-bold text-neutral-300 transition">
+          Test Benchmarks (B0018)
+        </button>
+      </div>
+    </header>
+
+    <!-- Out-of-Sample Metrics Modal Strip -->
+    <section id="strip_metrics_bench_x41" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="p-4 rounded-xl bg-transparent border border-white/10">
+        <span class="text-xs text-neutral-400 font-bold block">EVALUATED CELL (UNSEEN)</span>
+        <p id="metric_test_cell_v1" class="text-xl font-bold text-white mt-1">--</p>
+        <span class="text-[11px] text-neutral-400 font-bold mt-1 block">Zero train overlap</span>
+      </div>
+      <div class="p-4 rounded-xl bg-transparent border border-white/10">
+        <span class="text-xs text-neutral-400 font-bold block">ROOT MEAN SQUARED ERROR</span>
+        <p id="metric_rmse_v2" class="text-xl font-bold text-emerald-400 mt-1">--</p>
+        <span class="text-[11px] text-neutral-400 font-bold mt-1 block">Average cycle discrepancy</span>
+      </div>
+      <div class="p-4 rounded-xl bg-transparent border border-white/10">
+        <span class="text-xs text-neutral-400 font-bold block">EXPLAINED VARIANCE (R²)</span>
+        <p id="metric_r2_v3" class="text-xl font-bold text-emerald-400 mt-1">--</p>
+        <span class="text-[11px] text-neutral-400 font-bold mt-1 block">Degradation dynamics captured</span>
+      </div>
+    </section>
+
+    <!-- Cause & Effect Physics Guide Pill -->
+    <section
+      class="p-4 rounded-2xl bg-transparent border border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+      <div class="flex items-start gap-2.5">
+        <span class="text-base font-bold text-emerald-400">01</span>
+        <div>
+          <span class="text-white font-bold block">Cycle Count (Mileage)</span>
+          <p class="text-neutral-400 font-bold mt-0.5">Higher cycles thicken internal SEI layer, reducing remaining
+            lifespan steadily.</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <span class="text-base font-bold text-emerald-400">02</span>
+        <div>
+          <span class="text-white font-bold block">Voltage Drop (Resistance)</span>
+          <p class="text-neutral-400 font-bold mt-0.5">Discharge plateau below 3.48V signals high internal resistance
+            (IR drop).</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <span class="text-base font-bold text-emerald-400">03</span>
+        <div>
+          <span class="text-white font-bold block">Thermal Jumps (Fatigue)</span>
+          <p class="text-neutral-400 font-bold mt-0.5">Surface heat over 33°C spikes cumulative thermal fatigue,
+            triggering fast decay.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Left Column: Controls & Dynamic Feedback -->
+      <div class="lg:col-span-5 bg-transparent rounded-2xl border border-white/10 p-6 space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white">Operational Telemetry</h2>
+          <p class="text-xs text-neutral-400 font-bold mt-1">Simulate cell conditions to test prognostic response</p>
+        </div>
+
+        <!-- Presets -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-neutral-400">Quick States:</span>
+          <button onclick="apply_telemetry_preset_m4b(5, 3.55, 27.5)"
+            class="px-2.5 py-1 rounded-lg bg-transparent hover:bg-white/[0.08] text-xs font-bold text-emerald-400 border border-emerald-500/20 transition">Fresh
+            (C5)</button>
+          <button onclick="apply_telemetry_preset_m4b(65, 3.48, 32.5)"
+            class="px-2.5 py-1 rounded-lg bg-transparent hover:bg-white/[0.08] text-xs font-bold text-amber-400 border border-amber-500/20 transition">Mid-Life
+            (C65)</button>
+          <button onclick="apply_telemetry_preset_m4b(125, 3.39, 36.2)"
+            class="px-2.5 py-1 rounded-lg bg-transparent hover:bg-white/[0.08] text-xs font-bold text-rose-400 border border-rose-500/20 transition">Degraded
+            (C125)</button>
+        </div>
+
+        <form id="rul_telemetry_form_x7q" onsubmit="trigger_diagnostic_scan_seq_m14(event)" class="space-y-5">
+          <!-- Cycle Input -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label for="inp_cycle_num_p3" class="text-xs font-bold text-neutral-300">
+                Current Operational Cycle
+              </label>
+              <span id="badge_cycle_context_r9"
+                class="text-[11px] font-bold text-neutral-400 bg-white/[0.05] px-2 py-0.5 rounded">
+                Early Stage
+              </span>
+            </div>
+            <input type="number" id="inp_cycle_num_p3" min="1" max="168" value="10" required
+              oninput="update_dynamic_physics_feedback_w31()"
+              class="w-full bg-black border border-white/10 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <!-- Voltage Slider -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label for="inp_voltage_val_w8" class="text-xs font-bold text-neutral-300">
+                Discharge Plateau Voltage
+              </label>
+              <span id="label_voltage_display_k3" class="text-xs font-bold text-emerald-400">3.55 V</span>
+            </div>
+            <input type="range" id="inp_voltage_val_w8" min="2.6" max="3.75" step="0.01" value="3.55"
+              oninput="sync_voltage_slider_display_r1(this.value); update_dynamic_physics_feedback_w31();"
+              class="w-full accent-emerald-500 bg-neutral-900 rounded-lg h-1.5 cursor-pointer">
+          </div>
+
+          <!-- Temperature Slider -->
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label for="inp_temp_val_e2" class="text-xs font-bold text-neutral-300">
+                Operating Surface Temperature
+              </label>
+              <span id="label_temp_display_j9" class="text-xs font-bold text-emerald-400">27.5 °C</span>
+            </div>
+            <input type="range" id="inp_temp_val_e2" min="15.0" max="50.0" step="0.1" value="27.5"
+              oninput="sync_temp_slider_display_y4(this.value); update_dynamic_physics_feedback_w31();"
+              class="w-full accent-emerald-500 bg-neutral-900 rounded-lg h-1.5 cursor-pointer">
+          </div>
+
+          <!-- Live Physics Impact Assessment Indicator -->
+          <div class="p-3.5 rounded-xl bg-black border border-white/10 flex items-center justify-between">
+            <span class="text-xs font-bold text-neutral-400">Live Stress Assessment</span>
+            <span id="indicator_stress_level_k7" class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Nominal Physics State
+            </span>
+          </div>
+
+          <button type="submit" id="btn_submit_infer_u9"
+            class="w-full py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-black text-sm font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10">
+            <span>Scan Cell & Forecast RUL</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Right Column: Interactive Diagnostic & Prognostics Display -->
+      <div class="lg:col-span-7 flex flex-col justify-between space-y-6">
+
+        <!-- Diagnostic Animation Container (Active during scan) -->
+        <div id="diagnostic_animation_box_q2"
+          class="hidden bg-transparent rounded-2xl border border-white/10 p-8 flex flex-col items-center justify-center min-h-[300px] relative overflow-hidden">
+          <div class="scanning-beam-effect-u48"></div>
+
+          <!-- Battery Diagnostic Pulse Graphic -->
+          <div
+            class="w-32 h-16 rounded-xl border-2 border-emerald-400/80 p-1.5 relative flex items-center battery-pulse-glow-w22 mb-5">
+            <div class="absolute -right-3 top-4 bottom-4 w-2 rounded-r-md bg-emerald-400/80"></div>
+            <div id="battery_electrolyte_core_x9"
+              class="h-full bg-emerald-500 rounded-lg transition-all duration-300 w-3/4"></div>
+          </div>
+
+          <p id="label_diagnostic_ticker_v3" class="text-sm font-bold text-emerald-400 animate-pulse text-center">
+            Initializing Electrochemical Scan...
+          </p>
+          <span class="text-xs font-bold text-neutral-400 mt-2 text-center">
+            Synthesizing impedance ratios & cumulative heat history
+          </span>
+        </div>
+
+        <!-- Prognostics Result Panel (Revealed after scan) -->
+        <div id="prognostics_result_box_y8" class="bg-transparent rounded-2xl border border-white/10 p-6 space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-bold text-white">Prognostics Verdict</h2>
+              <p class="text-xs text-neutral-400 font-bold mt-0.5">Model output on current cell state</p>
+            </div>
+            <span id="badge_risk_level_c8"
+              class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-white/[0.04] text-neutral-400 border border-white/10">
+              READY FOR SCAN
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- RUL Large Display -->
+            <div class="bg-black p-5 rounded-xl border border-white/10">
+              <span class="text-xs font-bold text-neutral-400 block">FORECASTED USEFUL LIFE</span>
+              <div class="flex items-baseline gap-2 mt-2">
+                <span id="text_rul_output_k5" class="text-5xl font-bold text-white">--</span>
+                <span class="text-sm font-bold text-neutral-400">cycles remaining</span>
+              </div>
+              <span id="label_rul_explanation_c1" class="text-[11px] font-bold text-neutral-400 block mt-2">
+                Before 80% capacity retirement threshold
+              </span>
+            </div>
+
+            <!-- Health Classification -->
+            <div class="bg-black p-5 rounded-xl border border-white/10 flex flex-col justify-between">
+              <div>
+                <span class="text-xs font-bold text-neutral-400 block">HEALTH CLASSIFICATION</span>
+                <p id="text_health_status_x1" class="text-lg font-bold text-white mt-2">Nominal</p>
+              </div>
+              <p id="label_actionable_recommendation_z4" class="text-xs font-bold text-emerald-400 mt-3">
+                Cell safe for regular high-load operation.
+              </p>
+            </div>
+          </div>
+
+          <!-- Lifespan Bar -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-bold text-neutral-400">
+              <span>Depleted (0 cycles)</span>
+              <span id="label_nominal_limit_u9">Benchmark Span (167 cycles)</span>
+            </div>
+            <div class="w-full h-2.5 bg-neutral-900 rounded-full overflow-hidden border border-white/10">
+              <div id="bar_health_progress_n3" class="h-full bg-emerald-500 rounded-full transition-all duration-700"
+                style="width: 80%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Synthesized Physics Features Card -->
+        <div class="bg-transparent rounded-2xl border border-white/10 p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white">Derived Physical Features</h3>
+            <span class="text-[11px] font-bold text-neutral-400">Zero Target Leakage</span>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            <div class="p-3 rounded-xl bg-black border border-white/10">
+              <span class="text-neutral-400 font-bold block">V / T Ratio</span>
+              <span id="signal_vt_ratio_m7" class="text-white font-bold block mt-1 text-sm">--</span>
+              <span class="text-[10px] text-neutral-400 font-bold mt-0.5 block">Impedance proxy</span>
+            </div>
+            <div class="p-3 rounded-xl bg-black border border-white/10">
+              <span class="text-neutral-400 font-bold block">Rolling V (3c)</span>
+              <span id="signal_roll_v_h2" class="text-white font-bold block mt-1 text-sm">--</span>
+              <span class="text-[10px] text-neutral-400 font-bold mt-0.5 block">Filtered plateau</span>
+            </div>
+            <div class="p-3 rounded-xl bg-black border border-white/10">
+              <span class="text-neutral-400 font-bold block">Rolling T (3c)</span>
+              <span id="signal_roll_t_b4" class="text-white font-bold block mt-1 text-sm">--</span>
+              <span class="text-[10px] text-neutral-400 font-bold mt-0.5 block">Thermal trend</span>
+            </div>
+            <div class="p-3 rounded-xl bg-black border border-white/10">
+              <span class="text-neutral-400 font-bold block">Cum. Thermal Fatigue</span>
+              <span id="signal_thermal_stress_g1" class="text-white font-bold block mt-1 text-sm">--</span>
+              <span class="text-[10px] text-neutral-400 font-bold mt-0.5 block">Degree-cycles history</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Bottom Metadata Footer -->
+    <footer
+      class="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-xs font-bold text-neutral-400 gap-2">
+      <span>NASA Prognostics Center Battery Dataset · Model: LightGBM Regressor</span>
+      <span>Trained on Cells B0005, B0006, B0007 · Evaluated on Blind Cell B0018</span>
+    </footer>
+
+  </div>
+
+  <script>
+    const API_BASE_ENDPOINT_U8X = 'http://127.0.0.1:8000';
+
+    function sync_voltage_slider_display_r1(val) {
+      document.getElementById('label_voltage_display_k3').innerText = parseFloat(val).toFixed(2) + ' V';
+    }
+
+    function sync_temp_slider_display_y4(val) {
+      document.getElementById('label_temp_display_j9').innerText = parseFloat(val).toFixed(1) + ' °C';
+    }
+
+    function update_dynamic_physics_feedback_w31() {
+      const cycle = parseInt(document.getElementById('inp_cycle_num_p3').value) || 1;
+      const volt = parseFloat(document.getElementById('inp_voltage_val_w8').value);
+      const temp = parseFloat(document.getElementById('inp_temp_val_e2').value);
+
+      const cycleBadge = document.getElementById('badge_cycle_context_r9');
+      if (cycle < 35) {
+        cycleBadge.innerText = 'Early Life (Low SEI)';
+        cycleBadge.className = 'text-[11px] font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20';
+      } else if (cycle < 95) {
+        cycleBadge.innerText = 'Mid-Lifespan Plateau';
+        cycleBadge.className = 'text-[11px] font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/20';
+      } else {
+        cycleBadge.innerText = 'End-of-Life Horizon';
+        cycleBadge.className = 'text-[11px] font-bold text-rose-400 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/20';
+      }
+
+      const stressIndicator = document.getElementById('indicator_stress_level_k7');
+      if (temp > 35.0 || volt < 3.42) {
+        stressIndicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> High Internal Stress (IR Drop/Heat)';
+        stressIndicator.className = 'text-xs font-bold text-rose-400 flex items-center gap-1.5';
+      } else if (temp > 31.0 || volt < 3.50) {
+        stressIndicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Moderate Degradation Load';
+        stressIndicator.className = 'text-xs font-bold text-amber-400 flex items-center gap-1.5';
+      } else {
+        stressIndicator.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Nominal Physics State';
+        stressIndicator.className = 'text-xs font-bold text-emerald-400 flex items-center gap-1.5';
+      }
+    }
+
+    function apply_telemetry_preset_m4b(cycle, voltage, temp) {
+      document.getElementById('inp_cycle_num_p3').value = cycle;
+
+      const vSlider = document.getElementById('inp_voltage_val_w8');
+      vSlider.value = voltage;
+      sync_voltage_slider_display_r1(voltage);
+
+      const tSlider = document.getElementById('inp_temp_val_e2');
+      tSlider.value = temp;
+      sync_temp_slider_display_y4(temp);
+
+      update_dynamic_physics_feedback_w31();
+      document.getElementById('btn_submit_infer_u9').click();
+    }
+
+    async function fetch_model_benchmarks_h7y() {
+      const container = document.getElementById('strip_metrics_bench_x41');
+      try {
+        const res = await fetch(`${API_BASE_ENDPOINT_U8X}/api/v1/metrics`);
+        if (!res.ok) throw new Error('Metrics unavailable');
+        const data = await res.json();
+
+        document.getElementById('metric_test_cell_v1').innerText = data.evaluated_cell || 'B0018';
+        document.getElementById('metric_rmse_v2').innerText = `${data.rmse} cycles`;
+        document.getElementById('metric_r2_v3').innerText = `${(data.r2_score * 100).toFixed(1)}%`;
+        container.classList.toggle('hidden');
+      } catch (err) {
+        alert('Could not load benchmarks. Verify that app.py is running.');
+      }
+    }
+
+    async function trigger_diagnostic_scan_seq_m14(ev) {
+      ev.preventDefault();
+
+      const cycle_val = parseInt(document.getElementById('inp_cycle_num_p3').value);
+      const volt_val = parseFloat(document.getElementById('inp_voltage_val_w8').value);
+      const temp_val = parseFloat(document.getElementById('inp_temp_val_e2').value);
+
+      const animBox = document.getElementById('diagnostic_animation_box_q2');
+      const resultBox = document.getElementById('prognostics_result_box_y8');
+      const ticker = document.getElementById('label_diagnostic_ticker_v3');
+      const submitBtn = document.getElementById('btn_submit_infer_u9');
+
+      // 1. Activate Diagnostic Scanning State
+      resultBox.classList.add('opacity-40', 'pointer-events-none');
+      animBox.classList.remove('hidden');
+      submitBtn.disabled = true;
+
+      const tickerMessages = [
+        'Sampling terminal discharge voltage...',
+        'Computing V/T impedance ratio...',
+        'Accumulating lifetime thermal fatigue...',
+        'Inferring RUL via LightGBM ensemble...'
+      ];
+
+      let msgIndex = 0;
+      const tickerInterval = setInterval(() => {
+        msgIndex = (msgIndex + 1) % tickerMessages.length;
+        ticker.innerText = tickerMessages[msgIndex];
+      }, 350);
+
+      try {
+        const payload = { cycle: cycle_val, voltage: volt_val, temperature: temp_val };
+
+        const responsePromise = fetch(`${API_BASE_ENDPOINT_U8X}/api/v1/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        // Minimum 1.3s delay so the diagnostic animation completes smoothly
+        const [response] = await Promise.all([
+          responsePromise,
+          new Promise(resolve => setTimeout(resolve, 1300))
+        ]);
+
+        if (!response.ok) throw new Error('API inference failed: ' + response.statusText);
+        const result = await response.json();
+
+        clearInterval(tickerInterval);
+        animBox.classList.add('hidden');
+        resultBox.classList.remove('opacity-40', 'pointer-events-none');
+        submitBtn.disabled = false;
+
+        render_prognostic_verdict_k2s(result);
+      } catch (error) {
+        clearInterval(tickerInterval);
+        animBox.classList.add('hidden');
+        resultBox.classList.remove('opacity-40', 'pointer-events-none');
+        submitBtn.disabled = false;
+        alert('Diagnostic scan failed: ' + error.message);
+      }
+    }
+
+    function render_prognostic_verdict_k2s(result) {
+      const rul_val = result.predicted_rul_cycles;
+      const status_val = result.battery_health_status;
+      const risk_val = result.risk_level;
+      const signals = result.feature_payload_received;
+
+      // Update RUL Text
+      document.getElementById('text_rul_output_k5').innerText = rul_val;
+      document.getElementById('text_health_status_x1').innerText = status_val;
+
+      // Progress bar (Nominal baseline ~167 cycles)
+      const health_pct = Math.min(100, Math.max(0, (rul_val / 167) * 100));
+      const bar = document.getElementById('bar_health_progress_n3');
+      bar.style.width = health_pct + '%';
+
+      const badge = document.getElementById('badge_risk_level_c8');
+      const rec = document.getElementById('label_actionable_recommendation_z4');
+      badge.innerText = `RISK: ${risk_val}`;
+
+      if (risk_val === 'LOW') {
+        badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-950/40 text-emerald-400 border border-emerald-500/20';
+        bar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-700';
+        rec.innerText = 'Nominal state. Zero signs of premature degradation.';
+        rec.className = 'text-xs font-bold text-emerald-400 mt-3';
+      } else if (risk_val === 'MODERATE') {
+        badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-950/40 text-amber-400 border border-amber-500/20';
+        bar.className = 'h-full bg-amber-500 rounded-full transition-all duration-700';
+        rec.innerText = 'Moderate wear detected. Monitor thermal thresholds.';
+        rec.className = 'text-xs font-bold text-amber-400 mt-3';
+      } else {
+        badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-950/40 text-rose-400 border border-rose-500/20';
+        bar.className = 'h-full bg-rose-500 rounded-full transition-all duration-700';
+        rec.innerText = 'Warning: Rapid degradation. Cell retirement recommended.';
+        rec.className = 'text-xs font-bold text-rose-400 mt-3';
+      }
+
+      // Populate Signals
+      if (signals) {
+        document.getElementById('signal_vt_ratio_m7').innerText = signals.v_t_ratio ? signals.v_t_ratio.toFixed(4) : '--';
+        document.getElementById('signal_roll_v_h2').innerText = signals.voltage_roll_mean_3 ? signals.voltage_roll_mean_3.toFixed(2) + ' V' : '--';
+        document.getElementById('signal_roll_t_b4').innerText = signals.temp_roll_mean_3 ? signals.temp_roll_mean_3.toFixed(1) + ' °C' : '--';
+        document.getElementById('signal_thermal_stress_g1').innerText = signals.thermal_cum_stress ? Math.round(signals.thermal_cum_stress) : '--';
+      }
+    }
+
+    // Trigger initial state sync on page load
+    update_dynamic_physics_feedback_w31();
+  </script>
+</body>
+
+</html>

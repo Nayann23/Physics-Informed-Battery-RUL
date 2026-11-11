@@ -1,0 +1,7 @@
+{
+    "evaluated_cell": "B0018",
+    "test_sample_count": 132,
+    "rmse": 25.8762,
+    "mae": 25.2628,
+    "r2_score": 0.5388
+}

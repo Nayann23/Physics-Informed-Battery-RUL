@@ -1,0 +1,59 @@
+project:
+  name: "battery-rul-engine"
+  version: "1.0.0"
+
+logging:
+  log_dir: "logs"
+  log_level: "INFO"
+
+data:
+  raw_path: "data/raw/battery_cycle_level_dataset_CLEAN_FINAL.csv"
+  preprocessed_path: "data/preprocessed/battery_preprocessed.csv"
+  final_train_path: "data/final/train_features.csv"
+  final_test_path: "data/final/test_features.csv"
+  
+  # Minimum cycles required to consider a battery test complete
+  # Aborted/short tests (1-10 cycles) ko filter out karne ke liye
+  min_cycle_threshold: 50
+
+  # Production ground-truth variables to exclude from feature matrix
+  leakage_columns:
+    - "capacity"
+    - "soh"
+
+  # Real data audit bounds: V in [2.53, 3.75], Temp in [7.68, 54.99]
+  validation_ranges:
+    voltage_min: 2.0
+    voltage_max: 4.2
+    temp_min: 5.0
+    temp_max: 60.0
+
+pipeline:
+  debug_mode: false
+  debug_battery_id: "B0005"
+
+split:
+  # NASA benchmark complete degradation batteries
+  train_batteries:
+    - "B0005"
+    - "B0006"
+    - "B0007"
+  # Holdout unseen battery for final evaluation (132 full cycles)
+  test_batteries:
+    - "B0018"
+  target_column: "rul"
+
+model:
+  name: "lightgbm"
+  params:
+    n_estimators: 120
+    learning_rate: 0.05
+    max_depth: 4
+    num_leaves: 15
+    random_state: 42
+    n_jobs: -1
+
+artifacts:
+  model_dir: "artifacts/models"
+  metrics_dir: "artifacts/metrics"
+  preprocessor_dir: "artifacts/preprocessors"

@@ -1,0 +1,6 @@
+{
+    "rmse": 4.12,
+    "mae": 2.85,
+    "r2_score": 0.96,
+    "evaluated_cell": "B0018"
+}
